@@ -29,15 +29,15 @@ fn find_device_path_by_name(device_query: &str) -> io::Result<PathBuf> {
     })
 }
 
-async fn set_color(k: &Controller, mic_enabled: bool) -> Result<(), Box<dyn std::error::Error>> {
+async fn set_color(keyboard: &Controller, mic_enabled: bool) -> Result<(), Box<dyn std::error::Error>> {
     let color = if mic_enabled {
         Color::new(0, 255, 0)
     } else {
         Color::new(255, 0, 0)
     };
 
-    let mut cmd = k.cmd();
-    cmd.set_leds(vec![color; k.num_leds()])?;
+    let mut cmd = keyboard.cmd();
+    cmd.set_leds(vec![color; keyboard.num_leds()])?;
     cmd.execute().await?;
     Ok(())
 }
