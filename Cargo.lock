@@ -85,6 +85,7 @@ name = "darvos"
 version = "0.1.0"
 dependencies = [
  "evdev",
+ "nix",
  "openrgb2",
  "tokio",
 ]

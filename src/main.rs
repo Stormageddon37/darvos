@@ -1,10 +1,12 @@
 use evdev::{Device, EventType};
 use openrgb2::{Color, Controller, OpenRgbClient};
 use std::net::TcpListener;
-use std::process::{Command, Stdio};
+use std::process::{exit, Command, Stdio};
 use std::result::Result;
 use std::{env, io, path::PathBuf};
 use tokio::time::Duration;
+
+const RETRY_DELAY: Duration = Duration::from_secs(2);
 
 fn is_port_in_use(port: u16) -> bool {
     TcpListener::bind(("127.0.0.1", port)).is_err()
@@ -45,12 +47,17 @@ async fn set_color(keyboard: &Controller, color: Color) -> Result<(), Box<dyn st
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    if !nix::unistd::Uid::effective().is_root() {
+        println!("Darvos must run as root");
+        exit(1);
+    }
+
+
     let query = env::args().nth(1).unwrap_or_else(|| {
         eprintln!("Usage: darvos <device-name-or-substring>");
-        std::process::exit(2);
+        exit(2);
     });
 
-    let retry_delay = Duration::from_secs(10);
 
     let path = loop {
         match find_device_path_by_name(&query) {
@@ -58,24 +65,25 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             Err(e) => {
                 eprintln!(
                     "Failed to find device: {}. Retrying in {:?}...",
-                    e, retry_delay
+                    e, RETRY_DELAY
                 );
-                tokio::time::sleep(retry_delay).await;
+                tokio::time::sleep(RETRY_DELAY).await;
             }
         }
     };
-    println!("Using device: {:?}", path);
+    println!("Using device {:?} from query {:?}", path, query);
 
-    if is_port_in_use(6742) {
-        println!("OpenRGB server is already running");
+    while is_port_in_use(6742) {
         Command::new("pkill")
             .arg("openrgb")
             .stdin(Stdio::null())
             .stdout(Stdio::null())
             .stderr(Stdio::null())
             .status()?;
+        tokio::time::sleep(RETRY_DELAY).await;
     }
-    
+
+    println!("Starting OpenRGB server...");
     Command::new("openrgb")
         .arg("--server")
         .stdin(Stdio::null())
@@ -83,11 +91,22 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .stderr(Stdio::null())
         .spawn()?;
 
-    tokio::time::sleep(Duration::from_millis(10000)).await;
-
-    let client = OpenRgbClient::connect()
-        .await
-        .unwrap_or_else(|_| panic!("Could not connect to OpenRGB server"));
+    println!("Connecting to OpenRGB server...");
+    let client = loop {
+        match OpenRgbClient::connect().await {
+            Ok(client) => {
+                println!("Connected!");
+                break client
+            },
+            Err(e) => {
+                eprintln!(
+                    "{}. Retrying in {:?}...",
+                    e, RETRY_DELAY
+                );
+                tokio::time::sleep(RETRY_DELAY).await;
+            }
+        }
+    };
     let controllers = client.get_all_controllers().await?;
     controllers.init().await?;
 
