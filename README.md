@@ -11,6 +11,3 @@ cargo build --release
 ```
 sudo ./target/release/darvos my-device-name
 ```
-
-## Why `Darvos`?
-I was watching Dr Who while I was making it
