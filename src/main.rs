@@ -1,7 +1,10 @@
 use evdev::{Device, EventType};
 use openrgb2::{Color, Controller, OpenRgbClient};
+use std::process::{Command, Stdio};
 use std::result::Result;
 use std::{env, io, path::PathBuf};
+use tokio::time::Duration;
+
 fn find_device_path_by_name(device_query: &str) -> io::Result<PathBuf> {
     let device_query_lower = device_query.to_lowercase();
 
@@ -29,7 +32,10 @@ fn find_device_path_by_name(device_query: &str) -> io::Result<PathBuf> {
     })
 }
 
-async fn set_color(keyboard: &Controller, mic_enabled: bool) -> Result<(), Box<dyn std::error::Error>> {
+async fn set_color(
+    keyboard: &Controller,
+    mic_enabled: bool,
+) -> Result<(), Box<dyn std::error::Error>> {
     let color = if mic_enabled {
         Color::new(0, 255, 0)
     } else {
@@ -44,13 +50,20 @@ async fn set_color(keyboard: &Controller, mic_enabled: bool) -> Result<(), Box<d
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let needle = env::args().nth(1).unwrap_or_else(|| {
+    let query = env::args().nth(1).unwrap_or_else(|| {
         eprintln!("Usage: darvos <device-name-or-substring>");
         std::process::exit(2);
     });
 
-    let path = find_device_path_by_name(&needle)?;
+    let path = find_device_path_by_name(&query)?;
     println!("Using device: {:?}", path);
+
+    Command::new("openrgb")
+        .arg("--server")
+        .stdin(Stdio::null())
+        .spawn()?;
+
+    tokio::time::sleep(Duration::from_millis(10000)).await;
 
     let client = OpenRgbClient::connect().await?;
     let controllers = client.get_all_controllers().await?;
@@ -68,7 +81,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 }
             }
             set_color(&keyboard, mic_enabled).await?;
+            println!("Set color: {}", mic_enabled);
         }
+    } else {
+        println!("No keyboard found");
     }
 
     Ok(())
