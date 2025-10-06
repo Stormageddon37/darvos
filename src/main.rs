@@ -55,7 +55,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         std::process::exit(2);
     });
 
-    let path = find_device_path_by_name(&query)?;
+    let max_retries = 6;
+    let retry_delay = Duration::from_secs(10);
+    
+    let path = loop {
+        match find_device_path_by_name(&query) {
+            Ok(path) => break path,
+            Err(e) if max_retries > 0 => {
+                eprintln!("Failed to find device: {}. Retrying in {:?}...", e, retry_delay);
+                tokio::time::sleep(retry_delay).await;
+            }
+            Err(e) => return Err(e.into()),
+        }
+    };
     println!("Using device: {:?}", path);
 
     Command::new("openrgb")
