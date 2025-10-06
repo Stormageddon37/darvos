@@ -57,14 +57,6 @@ async fn main() -> Result<(), Box<dyn Error>> {
                 mic_enabled = event.value() != 0;
             }
         }
-        println!(
-            "{}",
-            if mic_enabled {
-                "Mic is unmuted"
-            } else {
-                "Mic is muted"
-            }
-        );
         let color = select_color(mic_enabled);
         set_keyboard_color(&keyboard, color).await?;
     }
