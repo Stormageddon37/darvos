@@ -45,7 +45,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     validate_is_root();
 
     let mut microphone = get_microphone().await?;
-     let mut mic_enabled = true; // Mic is on when plugged in
+    let mut mic_enabled = true; // Mic is on when plugged in
 
     let keyboard = get_keyboard().await?;
     println!("Using keyboard {:?}", keyboard.name());
