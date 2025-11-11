@@ -51,13 +51,26 @@ async fn main() -> Result<(), Box<dyn Error>> {
     println!("Using keyboard {:?}", keyboard.name());
     set_keyboard_color(&keyboard, DEFAULT_COLOR).await?;
 
+    let mut search_mic = false;
     loop {
-        for event in microphone.fetch_events()? {
-            if event.event_type() == EventType::ABSOLUTE {
-                mic_enabled = event.value() != 0;
-            }
+        if search_mic {
+            microphone = get_microphone().await?;
+            search_mic = false;
         }
-        let color = select_color(mic_enabled);
-        set_keyboard_color(&keyboard, color).await?;
+        match microphone.fetch_events() {
+            Ok(events) => {
+                for event in events {
+                    if event.event_type() == EventType::ABSOLUTE {
+                        mic_enabled = event.value() != 0;
+                    }
+                }
+                let color = select_color(mic_enabled);
+                set_keyboard_color(&keyboard, color).await?;
+            }
+            Err(err) => {
+                eprintln!("Failed to fetch events: {err}");
+                search_mic = true;
+            }
+        };
     }
 }
