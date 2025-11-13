@@ -1,15 +1,18 @@
 mod consts;
+mod openrgb_client;
 mod utils;
 mod validators;
-mod openrgb_client;
 
 use crate::consts::DEFAULT_COLOR;
+use crate::openrgb_client::kill_server;
 use crate::utils::{retry_find_device_path_by_name, select_color};
 use crate::validators::{validate_is_root, validate_server_running};
 use evdev::{Device, EventType};
+use futures::FutureExt;
 use openrgb2::{Color, Controller};
 use std::env;
 use std::error::Error;
+use std::panic::AssertUnwindSafe;
 use std::process::exit;
 use std::result::Result;
 
@@ -41,10 +44,13 @@ async fn set_keyboard_color(keyboard: &Controller, color: Color) -> Result<(), B
     Ok(())
 }
 
-#[tokio::main]
-async fn main() -> Result<(), Box<dyn Error>> {
-    validate_is_root();
+async fn cleanup() {
+    println!("Cleaning up...");
+    kill_server().await;
+    println!("Clean up complete.");
+}
 
+async fn init() -> Result<(), Box<dyn Error>> {
     let mut microphone = get_microphone().await?;
     let mut mic_enabled = true; // Mic is on when plugged in
 
@@ -74,4 +80,11 @@ async fn main() -> Result<(), Box<dyn Error>> {
             }
         };
     }
+}
+
+#[tokio::main]
+async fn main() {
+    validate_is_root();
+    let _ = AssertUnwindSafe(init()).catch_unwind().await;
+    cleanup().await
 }
