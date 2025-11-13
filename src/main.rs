@@ -1,6 +1,7 @@
 mod consts;
 mod utils;
 mod validators;
+mod openrgb_client;
 
 use crate::consts::DEFAULT_COLOR;
 use crate::utils::{retry_find_device_path_by_name, select_color};
